@@ -1,0 +1,121 @@
+---
+title: "modeling_model_2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(readxl,tidyverse,  scales, data.table, stringr, lubridate, zoo, odbc, parsedate, DBI,httr,readxl, sandwich, lmtest, stargazer, corrplot)
+data_model2 <- read_rds("model_2.rds")
+```
+
+On this model we are adding more variables to explain the variability of the amount of trips per capita by county. 
+
+  - Education: For education, we'll be looking at the percent of adults with a bachelor's degree or higher as of 2019. This specification is relevant because of the correlation between higher education and wage, which would impact someone's ability to go on vacations. 
+  - Estimate of median household income 2019
+  - Unemployment_rate_2020
+
+### (3) Education: Percent of adults with a high school diploma only, 2015-19
+
+Education: As we can see from the histogram, this distribution is approximately normal with positive skew since the median is greater than the mean. We can assume that his variable is approximately normal.
+
+```{r education-histogram}
+#mean(data_model2$pct_hdiploma_only) < median(data_model2$pct_hdiploma_only)
+
+education  <- data_model2 %>% 
+  ggplot() +
+  aes(x = pct_college_higher) + 
+  geom_histogram(aes(y=..density..), bins = 40) +
+  labs(
+    title    = "Percent of adults with a bachelor's degree or higher, 2015-19", 
+    x        = "% Percent of adults with a bachelor's degree or higher, 2015-19", 
+    y        = 'Frequency'
+  ) +
+    geom_density(alpha=.2)  
+education
+```
+
+### (4) Income: Estimate of median household income 2019 
+
+The Estimated median household income 2019 by county distribution is positively skewed since the mean is less than the median. However, we can assume normality on this variable by the WWL. We will apply a log transformation to control for the outliers in this variable.
+
+
+```{r income-histogram}
+#mean(data_model2$MEDHHINC_2019) < median(data_model2$MEDHHINC_2019)
+
+income  <- data_model2 %>% 
+  ggplot() +
+  aes(x = log(MEDHHINC_2019)) + 
+  geom_histogram(aes(y=..density..), bins = 40) +
+  labs(
+    title    = 'Estimate of median household income 2019', 
+    x        = 'Estimate of median household income 2019', 
+    y        = 'Frequency'
+  ) +
+    geom_density(alpha=.2)  
+income
+```
+### (5) Unemployment: Unemployment rate in 2020
+
+The Unemployment rate in 2020 by county distribution is positively skewed since the mean is less than the median. However, we can assume normality on this variable by the WWL. 
+
+```{r Unemployment-histogram, message=FALSE, warning=FALSE, echo= FALSE}
+#mean(data_model2$Unemployment_rate_2020) < median(data_model2$Unemployment_rate_2020)
+
+Unemployment  <- data_model2 %>% 
+  ggplot() +
+  aes(x = Unemployment_rate_2020) + 
+  geom_histogram(aes(y=..density..), bins = 40) +
+  labs(
+    title    = 'Unemployment rate in 2020', 
+    x        = '% Unemployment rate in 2020', 
+    y        = 'Frequency'
+  ) +
+    geom_density(alpha=.2)  
+Unemployment
+```
+
+
+### Relationship between the variables in this model
+
+As we can see on the correlation plot, the number of trips per capita has a negative correlation with the education of a county. The higher the percentage of people with a bachelor's degree or higher, the less we can expect to travel. Also, The number of trips has a negative correlation with unemployment and income
+
+```{r correlogram, message=FALSE, warning=FALSE, echo= FALSE}
+matrix2 <- data_model2[,c("Administered_Dose1_Pop_Pct", "sum_of_trips", "pct_college_higher", "MEDHHINC_2019", "Unemployment_rate_2020")]
+colnames(matrix2) <- c('vaccine', 'trips', 'education', 'income', 'unemployment')
+M <- round(cor(matrix2),2)
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(M, method = "color", col = col(200),  
+         type = "upper", order = "hclust", 
+         addCoef.col = "black", 
+         tl.col = "darkblue", tl.srt = 90,
+         )
+```
+
+
+### Modeling
+```{r modeling, message=FALSE, warning=FALSE}
+library(stargazer)
+model_2 <- lm(sum_of_trips ~ Administered_Dose1_Pop_Pct + pct_college_higher + log(MEDHHINC_2019) + Unemployment_rate_2020, data_model2)
+summary(model_2)
+#stargazer(model_1, model_2, title="Regression Results", type= "html", out="model.txt")
+```
+We can see that, at a county level, when we increase the administered dose 1 of covid vaccine percentages, the number of trips per capita tend to decrease 0.001 points. This is not a statistically significant coefficient, at 1% level of significance. As expected, in counties with a higher percentage of people with a bachelor's degree or higher, the number of trips decreases, statistically significant at a 1% level of significance. The county's median income has a negative effect on the number of trips that the population is taking, meaning that a % increase in income results in a 0.007 increase in the number of trips per capita. As expected, in counties with high unemployment, the amount of trips per capita decreases. 
+
+The R squared in this model increased compared to the R squared of model one. This model is explaining more variability in the number of trips per capita. 
+
+### Model Diagnostics###
+```{r modeling, message=FALSE, warning=FALSE}
+par(mfrow = c(2,2))
+plot(model_2)
+```
+
+When we evaluate the diagnostics for this model, we can see a pattern on the residuals vs. fitted values, which suggests heteroskedasticity. The residuals tend to spread from left to right. On normality, we can see that the residuals appear normally distributed at the beginning of the theoretical quantiles and then fall away from the 45 degrees line. For this behavior, we cannot assume normality on this model. 
+
+On model 3, we will add more variables to explain the variability of the number of trips per capita.
+
+
+
+
+
+

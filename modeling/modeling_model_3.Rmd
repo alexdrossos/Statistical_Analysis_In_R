@@ -1,0 +1,85 @@
+---
+title: "modeling_model_3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+pacman::p_load(readxl,tidyverse,  scales, data.table, stringr, lubridate, zoo, odbc, parsedate, DBI,httr,readxl, sandwich, lmtest, stargazer, corrplot,hrbrthemes)
+
+data_model2 <- read_rds("model_2.rds")
+data_model3 <- read_rds("model_3.rds")
+```
+
+On this model we are adding more variables to explain the variability of the amount of trips per capita by county. 
+    - Age Group
+    - Region (4)
+
+### (3) Age groups: Different age groups by county
+
+```{r age_groups-histogram}
+hist(data_model3$pct_children)
+```
+
+### (5) US Regions 
+We are not using these variables because the data is imbalanced. Meaning that there are US Regions that have significantly more counties than others.
+
+```{r usRegions}
+p <- data_model3 %>%
+  ggplot( aes(x=sum_of_trips, fill=USRegion)) +
+    geom_histogram( color="#e9ecef", alpha=0.6, position = 'identity', bins=60 )   +
+    facet_wrap(~USRegion)
+    #scale_fill_manual(values=c("#69b3a2", "#404080")) +
+    #theme_ipsum() +
+    #labs(fill="")
+
+prop.table(table(data_model3$USRegion))
+```
+
+
+
+### Relationship between the variables in this model
+
+```{r correlogram, message=FALSE, warning=FALSE, echo= FALSE}
+matrix3 <- data_model3[, c("sum_of_trips" , "Administered_Dose1_Pop_Pct" , "pct_college_higher" , "MEDHHINC_2019" , "Unemployment_rate_2020" , "pct_children"  ,"pct_adults18", "pct_adults45") ]
+
+
+colnames(matrix3) <- c('vaccine', 'trips', 'education', 'income', 'unenployment', 'children', 'adults18', 'adults45')
+
+M <- round(cor(matrix3),2)
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(M, method = "color", col = col(200),  
+         type = "upper", order = "hclust", 
+         addCoef.col = "black", 
+         tl.col = "darkblue", tl.srt = 90,
+         )
+```
+
+
+
+
+
+### Modeling
+```{r modeling, message=FALSE, warning=FALSE}
+library(stargazer)
+model_3 <- lm(sum_of_trips ~ Administered_Dose1_Pop_Pct + pct_college_higher + log(MEDHHINC_2019) + Unemployment_rate_2020 + pct_children 
+              + pct_adults18 + pct_adults45, data_model3)
+summary(model_3)
+#stargazer(model_1, model_2, model_3, title="Regression Results", type= "html", out="model.txt")
+```
+
+
+### Model Diagnostics###
+```{r modeling, message=FALSE, warning=FALSE}
+par(mfrow = c(2,2))
+plot(model_3)
+```
+
+When we evaluate the diagnostics for this model we can see that there is a pattern on the residuals vs. fitted values, which suggest heteroskedasticity.The residuals tend to spread from left to right. On normality, we can see that the residuals appear normally distributed at the beginning of the theoretical quantiles and then fall away from the 45 degree line. For this behavior, we cannot assume normality on this model. 
+
+
+

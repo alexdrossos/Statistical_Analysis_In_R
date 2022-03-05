@@ -1,0 +1,91 @@
+---
+title: "modeling_model_1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(readxl,tidyverse,  scales, data.table, stringr, lubridate, zoo, odbc, parsedate, DBI,httr,readxl, sandwich, lmtest, stargazer)
+data_model1 <- read_rds("model_1.rds")
+```
+
+Sample size: On this dataset we have 2,421 counties out of 3,007 counties that are located inside the 50 states of the United Sates according to US census reference: https://www2.census.gov/geo/pdfs/reference/GARM/Ch4GARM.pdf
+
+### (1) Administered Dose
+
+Vaccination rate: 1st dose administered. As we can see from the histogram, this distribution is negatively skewed since the mean is greater than the median. However, we can assume normality on this variable by the Weak law of large numbers. 
+
+```{r Dose-histogram}
+vaccine_histogram  <- data_model1%>% 
+  ggplot() +
+  aes(x = Administered_Dose1_Pop_Pct) + 
+  geom_histogram(bins = 40) +
+  labs(
+    title    = 'Administered Covid Vaccination- Dose 1', 
+    x        = '% of Administered Dose by County', 
+    y        = 'Frequency'
+  )
+vaccine_histogram
+```
+
+### (2) Trips per Capita by County
+
+The amount of trips per Capita by county distribution is positively skewed since the mean is less than the median. However, we can assume normality on this variable by the WWL. 
+
+
+```{r Trips-histogram}
+trips_histogram <- data_model1%>% 
+  ggplot() +
+  aes(x = sum_of_trips) + 
+  geom_histogram(bins = 40) +
+  labs(
+    title    = 'Trips per Capita Distribution', 
+    x        = 'Trips per Capita by County', 
+    y        = 'Frequency'
+  )
+trips_histogram
+```
+
+
+
+### Relationship between Trips per Capita and Administered Dose 1 
+There is no defined linear relationship between the administered dose one and the trips per Capita by county. The correlation between these two variables is negative (21.74%), suggesting that as we go further to counties with a more significant percentage of their population with the first vaccine, their citizens tend to travel less than those who have administered the first vaccine on a smaller scale.  
+
+```{r relationship_vac_trips, message=FALSE, warning=FALSE}
+relationship_vac_trips <- ggplot(data_model1, aes(x=Administered_Dose1_Pop_Pct, y=sum_of_trips)) + geom_point() + geom_smooth() + 
+  labs(title="Amount of Trips (per capita) vs. Administered Dose 1 (%) \n by County in the United States", x="Administered Dose (%)", y="Amount of Trips")
+relationship_vac_trips
+
+#Correlation
+#cor(data_model1$Administered_Dose1_Pop_Pct, data_model1$sum_of_trips)
+```
+
+
+### Modeling
+```{r modeling, message=FALSE, warning=FALSE}
+library(stargazer)
+model_1 <- lm(sum_of_trips ~ Administered_Dose1_Pop_Pct, data_model1)
+summary(model_1)
+#stargazer(model_1, title="Regression Results", type= "html", out="model.txt")
+```
+We can see that, at a county level, when we increase the administered dose 1 of covid vaccine percentages, the number of trips per Capita tend to decrease 0.011 points. This is a statistically significant coefficient at a 1% level of significance. 
+
+The R squared in this model is very small, meaning that the administered dose 1 is not explaining the variability that we can see on the number of trips per Capita in the United States at a county level.
+
+### Model Diagnostics###
+```{r modeling, message=FALSE, warning=FALSE}
+par(mfrow = c(2,2))
+plot(model_1)
+```
+
+When we evaluate the diagnostics for this model, we can see a pattern on the residuals vs. fitted values. 
+The residuals tend to agglomerate after 1.0 with some outliers. On normality, we can see that the residuals appear normally distributed at the beginning of the theoretical quantiles and then fall away from the 45 line. For this behavior, we cannot assume normality on this model. 
+
+We are going to add more variables to explain the variability of the number of trips per Capita.
+
+
+
+
+
+
+

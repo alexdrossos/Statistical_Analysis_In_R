@@ -1,0 +1,71 @@
+---
+title: "Lab 2 EDA"
+author: 'Alex,Linh,Andres'
+date: "7/15/2021"
+output: pdf_document
+---
+
+```{r load packages, message = FALSE}
+library(tidyverse)
+library(broom)
+library(patchwork)
+library(sandwich)
+library(lmtest)
+library(lubridate)
+```
+
+```{r}
+trips <- read.csv("Trips_by_Distance.csv")
+```
+
+```{r}
+#change date to ymd format to pull out month, day, year
+names(trips$County.FIPS)
+#unique(trips$Level)
+#trips <- trips %>% 
+#  mutate(
+#    new_dates = ymd(Date)
+#  )
+```
+
+```{r}
+#get total population column
+trips <- trips %>% 
+  mutate(
+    total_population = Population.Staying.at.Home + Population.Not.Staying.at.Home
+  )
+#get trips > 100 
+trips <- trips %>% 
+  mutate(
+    trips_100_or_greater = Number.of.Trips.100.250 + Number.of.Trips.250.500 + Number.of.Trips...500
+  )
+#get trips per capita column 
+trips <- trips %>% 
+  mutate(
+    trips_per_capita = trips_100_or_greater / total_population
+  )
+```
+
+```{r}
+glimpse(trips)
+```
+
+
+```{r create june filter}
+june_trips <- trips %>%
+  filter(
+    year(new_dates) == '2021' & month(new_dates) == '6'
+  )
+```
+
+```{r}
+glimpse(trips)
+```
+
+```{r}
+final_trips_data <- june_trips %>%
+  group_by(State.Postal.Code) %>%
+  summarize(sum_of_trips = sum(trips_per_capita, na.rm = TRUE))
+final_trips_data
+```
+
